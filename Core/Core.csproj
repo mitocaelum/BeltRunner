@@ -1,0 +1,59 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <AssemblyName>BeltRunner.Core</AssemblyName>
+        <RootNamespace>BeltRunner</RootNamespace>
+        <LangVersion>12</LangVersion>
+        <Nullable>enable</Nullable>
+        <DefaultItemExcludes>$(DefaultItemExcludes);artifacts\**</DefaultItemExcludes>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>BeltRunner.Core</PackageId>
+        <Title>Belt Runner Core</Title>
+        <Description>BeltRunner is a framework for defining and running linear multi-phase application workflows with Rx-based telemetry and interaction.</Description>
+        <Authors>mitocaelum</Authors>
+        <Company>mitocaelum</Company>
+        <Product>BeltRunner</Product>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageTags>workflow;pipeline;orchestration;rx;reactive;automation</PackageTags>
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <Copyright>Copyright 2026 mitocaelum. All rights reserved. </Copyright>
+        <PackageProjectUrl>https://github.com/mitocaelum/BeltRunner</PackageProjectUrl>
+        <PackageIcon>Logo256.png</PackageIcon>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <RepositoryUrl>https://github.com/mitocaelum/BeltRunner</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <EnablePackageValidation Condition="'$(BeltRunnerPackageValidationBaselineVersion)' != ''">true</EnablePackageValidation>
+        <PackageValidationBaselineVersion Condition="'$(BeltRunnerPackageValidationBaselineVersion)' != ''">$(BeltRunnerPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
+        <MinVerTagPrefix>v</MinVerTagPrefix>
+        <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
+        <BeltRunnerBuildNumber Condition="'$(BeltRunnerBuildNumber)' == '' and '$(GITHUB_RUN_NUMBER)' != ''">$(GITHUB_RUN_NUMBER)</BeltRunnerBuildNumber>
+        <BeltRunnerBuildNumber Condition="'$(BeltRunnerBuildNumber)' == ''">0</BeltRunnerBuildNumber>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All"/>
+        <PackageReference Include="NLog" Version="6.1.1"/>
+        <PackageReference Include="System.Reactive" Version="6.1.0"/>
+        <None Include="README.NuGet.md" Pack="true" PackagePath="README.md" />
+        <None Include="..\LICENSE" Pack="true" PackagePath="/" />
+        <None Include="Logo256.png" Pack="true" PackagePath="/">
+            <Link>Logo256.png</Link>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Core\" />
+    </ItemGroup>
+
+    <Target Name="BeltRunnerVersionOverrides" AfterTargets="MinVer">
+        <PropertyGroup>
+            <FileVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch).$(BeltRunnerBuildNumber)</FileVersion>
+        </PropertyGroup>
+    </Target>
+
+</Project>

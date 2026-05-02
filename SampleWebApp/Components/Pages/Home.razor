@@ -1,0 +1,367 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using BeltRunner.SampleWebApp.ScrapingDemo.Scraping
+@implements IDisposable
+@inject ScrapingDemoState State
+@inject ScrapingDemoController Controller
+
+<PageTitle>Scraping Demo</PageTitle>
+
+<div class="workspace-shell">
+    <section class="hero-panel">
+        <div class="hero-copy">
+            <p class="eyebrow">BeltRunner Sample</p>
+            <h1>Interactive Run Monitoring Demo</h1>
+            <p class="hero-text">
+                This sample highlights convenience-first startup, live phase snapshots, operator interactions, and runtime diagnostics in a single web workflow.
+            </p>
+        </div>
+
+        <div class="feature-strip">
+            <span class="feature-pill">Convenience Startup</span>
+            <span class="feature-pill">Live Snapshots</span>
+            <span class="feature-pill">Operator Interactions</span>
+            <span class="feature-pill">Runtime Diagnostics</span>
+        </div>
+
+        <div class="run-bar">
+            <input class="url-input" @bind="sourceUrl" placeholder="https://example.com/start" />
+            <button class="run-button" @onclick="ExecuteAsync" disabled="@State.IsRunning">Run</button>
+        </div>
+
+        <div class="run-secondary-actions">
+            <button class="log-button" @onclick="OpenLogDialog">Open App Logs</button>
+        </div>
+
+        <div class="run-options">
+            <label class="option-checkbox">
+                <input type="checkbox" @bind="injectAuthenticationChallenge" />
+                <span>Simulate an authentication challenge in Phase 1</span>
+            </label>
+            <br/>
+            <label class="option-checkbox">
+                <input type="checkbox" @bind="injectMinorWarning" />
+                <span>Simulate a recoverable anomaly in Phase 2</span>
+            </label>
+        </div>
+
+        <div class="status-strip">
+            <span class="status-label">Status</span>
+            <span class="status-text">@State.StatusMessage</span>
+            @if( !string.IsNullOrWhiteSpace(State.ErrorMessage) ) {
+                <span class="error-text">@State.ErrorMessage</span>
+            }
+        </div>
+    </section>
+
+    <section class="phase-grid">
+        @foreach( PhasePanelState phase in State.Phases ) {
+            <article class="phase-panel @GetPhasePanelCssClass(phase)">
+                <header class="phase-header">
+                    <div>
+                        <p class="phase-kicker">Phase</p>
+                        <h2>@phase.Title</h2>
+                    </div>
+                    <div class="phase-meta">
+                        <span class="phase-count">@GetUnitCountLabel(phase)</span>
+                        <span class="phase-progress-value">@GetPhaseCompletionLabel(phase)</span>
+                        @if( phase.HasError ) {
+                            <span class="phase-badge is-error">Error</span>
+                        } else if( phase.HasWarning ) {
+                            <span class="phase-badge is-warning">Warning</span>
+                        }
+                    </div>
+                </header>
+
+                @if( !string.IsNullOrWhiteSpace(phase.DiagnosticMessage) ) {
+                    <div class="phase-diagnostic @(phase.HasError ? "is-error" : "is-warning")">
+                        @phase.DiagnosticMessage
+                    </div>
+                }
+
+                <div class="phase-progress">
+                    <div class="phase-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@phase.PhasePercentage">
+                        <div class="phase-progress-fill" style="@GetPhaseWidthStyle(phase)"></div>
+                    </div>
+                    <div class="phase-progress-meta">
+                        <span>@GetPhaseProgressCaption(phase)</span>
+                        <span>@phase.PhasePercentage%</span>
+                    </div>
+                </div>
+
+                @if( IsWaitingForUnits(phase) ) {
+                    <div class="phase-placeholder">Waiting to start</div>
+                } else {
+                    <div class="unit-list">
+                        @foreach( UnitProgressState unit in phase.Units ) {
+                            <div class="unit-card">
+                                <div class="unit-progress-fill" style="@GetUnitWidthStyle(unit)"></div>
+                                <div class="unit-content">
+                                    <span class="unit-name">@unit.Name</span>
+                                    <span class="unit-ratio">@unit.Percentage%</span>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+            </article>
+        }
+    </section>
+
+    <section class="diagnostics-panel">
+        <div class="result-header">
+            <p class="eyebrow">Diagnostics</p>
+            <h2>Runtime Signals</h2>
+            <p class="hero-text diagnostics-copy">
+                These entries come from BeltRunner diagnostics and show what the run is reporting in real time.
+            </p>
+        </div>
+
+        @if( State.Diagnostics.Count == 0 ) {
+            <div class="result-placeholder">Runtime diagnostics will appear here while the workflow is active.</div>
+        } else {
+            <div class="diagnostic-list">
+                @foreach( DiagnosticEntryState diagnostic in State.Diagnostics ) {
+                    <article class="diagnostic-card @GetDiagnosticCssClass(diagnostic)">
+                        <div class="diagnostic-header">
+                            <span class="diagnostic-badge">@diagnostic.SeverityLabel</span>
+                            <span class="diagnostic-meta">@diagnostic.ScopeLabel</span>
+                            <span class="diagnostic-meta">@diagnostic.Timestamp.ToString("HH:mm:ss.fff")</span>
+                        </div>
+                        <p class="diagnostic-body">@diagnostic.Message</p>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+
+    <section class="result-panel">
+        <div class="result-header">
+            <p class="eyebrow">Result</p>
+            <h2>Statistics Summary</h2>
+        </div>
+
+        @if( State.ResultItems.Count == 0 ) {
+            <div class="result-placeholder">Generated statistics will appear here after the run completes.</div>
+        } else {
+            <div class="result-meta">
+                <span>Generated at: @State.ResultGeneratedAt?.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                <span>Target pages: @State.ResultTargetPageCount</span>
+                <span>Vectors: @State.ResultVectorCount</span>
+            </div>
+
+            <div class="result-grid">
+                @foreach( ResultItemState item in State.ResultItems ) {
+                    <article class="result-card">
+                        <h3>@item.Name</h3>
+                        <p class="result-value">@item.Value</p>
+                        <p class="result-description">@item.Description</p>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@if( State.DialogRequestId.HasValue ) {
+    <div class="dialog-backdrop">
+        <section class="dialog-panel" role="dialog" aria-modal="true">
+            <p class="eyebrow">Interaction</p>
+            <h2>@State.DialogTitle</h2>
+            <p class="dialog-message">@State.DialogMessage</p>
+            <p class="dialog-meta">Phase key: @State.DialogPhaseKey / Kind: @State.DialogKind</p>
+
+            @if( IsAuthenticationDialog() ) {
+                <div class="dialog-fields">
+                    <input class="url-input" @bind="dialogUserName" placeholder="User name" />
+                    <input class="url-input" type="password" @bind="dialogPassword" placeholder="Password" />
+                </div>
+
+                <div class="dialog-actions">
+                    <button class="dialog-button dialog-button-primary" @onclick="SubmitAuthenticationAsync">OK</button>
+                    <button class="dialog-button" @onclick="CancelAuthenticationAsync">Cancel</button>
+                </div>
+            } else {
+                <div class="dialog-actions">
+                    <button class="dialog-button dialog-button-primary" @onclick="AcceptInteractionAsync">Continue</button>
+                    <button class="dialog-button" @onclick="RejectInteractionAsync">Stop Run</button>
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@if( State.IsLogDialogOpen ) {
+    <div class="dialog-backdrop">
+        <section class="dialog-panel dialog-panel-wide" role="dialog" aria-modal="true" aria-label="Application logs">
+            <div class="dialog-title-row">
+                <div>
+                    <p class="eyebrow">App Logs</p>
+                    <h2>Application Logs</h2>
+                    <p class="dialog-message">These entries come from the sample's NLog integration.</p>
+                </div>
+                <button class="dialog-button dialog-button-secondary" @onclick="CloseLogDialog">Close</button>
+            </div>
+
+            @if( State.LogEntries.Count == 0 ) {
+                <div class="log-empty-state">No application logs have been captured yet.</div>
+            } else {
+                <div class="log-list" role="log" aria-live="polite">
+                    @foreach( string logEntry in State.LogEntries ) {
+                        <div class="log-entry">@logEntry</div>
+                    }
+                </div>
+            }
+        </section>
+    </div>
+}
+
+@code {
+    private const string AuthenticationChallengeKind = "phase1-auth-challenge";
+
+    private bool injectAuthenticationChallenge;
+    private bool injectMinorWarning;
+    private Guid? lastDialogRequestId;
+    private string dialogPassword = string.Empty;
+    private string dialogUserName = string.Empty;
+    private string sourceUrl = "https://example.com/start";
+
+    protected override void OnInitialized() {
+        State.Changed += OnStateChanged;
+    }
+
+    public void Dispose() {
+        State.Changed -= OnStateChanged;
+    }
+
+    //  RefID: RefStart
+    private async Task ExecuteAsync() {
+        await Controller.InvokeHost(this.sourceUrl, this.injectAuthenticationChallenge, this.injectMinorWarning);
+    }
+
+    private void OpenLogDialog() {
+        Controller.ShowLogs();
+    }
+
+    private void CloseLogDialog() {
+        Controller.CloseLogs();
+    }
+
+    private async Task AcceptInteractionAsync() {
+        await Controller.RespondAsync(true);
+    }
+
+    private async Task SubmitAuthenticationAsync() {
+        await Controller.SubmitCredentialsAsync(this.dialogUserName, this.dialogPassword);
+        ClearDialogInputs();
+    }
+
+    private async Task CancelAuthenticationAsync() {
+        await Controller.RejectAsync("The operator canceled the authentication dialog.");
+        ClearDialogInputs();
+    }
+
+    private async Task RejectInteractionAsync() {
+        await Controller.RespondAsync(false);
+    }
+
+    private static string GetPhasePanelCssClass(PhasePanelState phase) {
+        List<string> classes = [];
+
+        if( phase.IsCompleted ) {
+            classes.Add("is-completed");
+        } else if( phase.IsActive ) {
+            classes.Add("is-active");
+        }
+
+        if( phase.HasError ) {
+            classes.Add("has-error");
+        } else if( phase.HasWarning ) {
+            classes.Add("has-warning");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private static string GetUnitCountLabel(PhasePanelState phase) {
+        if( phase.TotalUnits.HasValue && phase.TotalUnits.Value > 0 ) {
+            int plannedUnits = Math.Max(phase.TotalUnits.Value, phase.Units.Count);
+            return plannedUnits == 1 ? "1 planned unit" : $"{plannedUnits} planned units";
+        }
+
+        if( phase.Units.Count == 0 ) {
+            return "Waiting for units";
+        }
+
+        return phase.Units.Count == 1 ? "1 tracked unit" : $"{phase.Units.Count} tracked units";
+    }
+
+    private static string GetPhaseCompletionLabel(PhasePanelState phase) {
+        if( phase.TotalUnits.HasValue && phase.TotalUnits.Value > 0 ) {
+            int plannedUnits = Math.Max(phase.TotalUnits.Value, phase.Units.Count);
+            int completedUnits = Math.Min(phase.ProcessedUnits, plannedUnits);
+            return $"{completedUnits}/{plannedUnits} completed";
+        }
+
+        if( phase.ProcessedUnits > 0 ) {
+            return $"{phase.ProcessedUnits} completed";
+        }
+
+        return "No completed units yet";
+    }
+
+    private static string GetPhaseProgressCaption(PhasePanelState phase) {
+        if( phase.Units.Count > 0 ) {
+            return phase.Units.Count == 1 ? "1 tracked snapshot" : $"{phase.Units.Count} tracked snapshots";
+        }
+
+        if( phase.TotalUnits.HasValue && phase.TotalUnits.Value > 0 ) {
+            return phase.TotalUnits.Value == 1 ? "1 unit is planned" : $"{phase.TotalUnits.Value} units are planned";
+        }
+
+        return "Waiting for telemetry";
+    }
+
+    private static bool IsWaitingForUnits(PhasePanelState phase) {
+        return phase.Units.Count == 0 && phase.TotalUnits is null;
+    }
+
+    private static string GetDiagnosticCssClass(DiagnosticEntryState diagnostic) {
+        if( diagnostic.IsError ) {
+            return "is-error";
+        }
+
+        if( diagnostic.IsWarning ) {
+            return "is-warning";
+        }
+
+        return "is-info";
+    }
+
+    private static string GetUnitWidthStyle(UnitProgressState unit) {
+        return $"width: {unit.Percentage}%";
+    }
+
+    private static string GetPhaseWidthStyle(PhasePanelState phase) {
+        return $"width: {phase.PhasePercentage}%";
+    }
+
+    private void OnStateChanged() {
+        Guid? currentDialogRequestId = State.DialogRequestId;
+        if( this.lastDialogRequestId != currentDialogRequestId ) {
+            this.lastDialogRequestId = currentDialogRequestId;
+            ClearDialogInputs();
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsAuthenticationDialog() {
+        return State.DialogKind == AuthenticationChallengeKind;
+    }
+
+    private void ClearDialogInputs() {
+        this.dialogUserName = string.Empty;
+        this.dialogPassword = string.Empty;
+    }
+}

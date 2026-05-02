@@ -1,0 +1,92 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <IsPackable>true</IsPackable>
+        <Nullable>enable</Nullable>
+        <LangVersion>12</LangVersion>
+
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <IsRoslynComponent>true</IsRoslynComponent>
+
+        <RootNamespace>BeltRunner</RootNamespace>
+        <AssemblyName>BeltRunner.Analysis</AssemblyName>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>BeltRunner.Analysis</PackageId>
+        <Title>BeltRunner.Analysis</Title>
+        <Authors>mitocaelum</Authors>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <Copyright>Copyright 2026 mitocaelum. All rights reserved. </Copyright>
+        <PackageProjectUrl>https://github.com/mitocaelum/BeltRunner</PackageProjectUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageIcon>Logo256.png</PackageIcon>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <RepositoryUrl>https://github.com/mitocaelum/BeltRunner</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <EnablePackageValidation Condition="'$(BeltRunnerPackageValidationBaselineVersion)' != ''">true</EnablePackageValidation>
+        <PackageValidationBaselineVersion Condition="'$(BeltRunnerPackageValidationBaselineVersion)' != ''">$(BeltRunnerPackageValidationBaselineVersion)</PackageValidationBaselineVersion>
+        <MinVerTagPrefix>v</MinVerTagPrefix>
+        <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
+        <BeltRunnerBuildNumber Condition="'$(BeltRunnerBuildNumber)' == '' and '$(GITHUB_RUN_NUMBER)' != ''">$(GITHUB_RUN_NUMBER)</BeltRunnerBuildNumber>
+        <BeltRunnerBuildNumber Condition="'$(BeltRunnerBuildNumber)' == ''">0</BeltRunnerBuildNumber>
+        <Description>Roslyn analyzers for BeltRunner that guide phase authors toward recommended APIs and highlight low-level usage patterns.</Description>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="MinVer" Version="7.0.0" PrivateAssets="All"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.0"/>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.3.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Core\Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Update="Resources.resx">
+            <Generator>ResXFileCodeGenerator</Generator>
+            <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+        </EmbeddedResource>
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Update="Resources.Designer.cs">
+            <DesignTime>True</DesignTime>
+            <AutoGen>True</AutoGen>
+            <DependentUpon>Resources.resx</DependentUpon>
+        </Compile>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="README.NuGet.md">
+        <Pack>true</Pack>
+        <PackagePath>README.md</PackagePath>
+      </None>
+      <None Update="Logo256.png">
+        <Pack>true</Pack>
+        <PackagePath>/</PackagePath>
+        <Link>Logo256.png</Link>
+      </None>
+    </ItemGroup>
+
+    <Target Name="BeltRunnerAnalysisVersionOverrides" AfterTargets="MinVer">
+        <PropertyGroup>
+            <FileVersion>$(MinVerMajor).$(MinVerMinor).$(MinVerPatch).$(BeltRunnerBuildNumber)</FileVersion>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="BeltRunnerAnalysisExactCoreDependency" BeforeTargets="GenerateNuspec" DependsOnTargets="_GetProjectReferenceVersions">
+        <ItemGroup>
+            <_ProjectReferencesWithVersions Update="@(_ProjectReferencesWithVersions)">
+                <ProjectVersion>[%(_ProjectReferencesWithVersions.ProjectVersion)]</ProjectVersion>
+            </_ProjectReferencesWithVersions>
+        </ItemGroup>
+    </Target>
+
+</Project>

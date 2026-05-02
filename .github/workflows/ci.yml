@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    tags-ignore:
+      - "v*"
+  pull_request:
+
+jobs:
+  build-test-pack:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_VALIDATION_BASELINE_VERSION: ${{ vars.BELTRUNNER_PACKAGE_VALIDATION_BASELINE_VERSION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore Core.TEST
+        run: dotnet restore Core.TEST/Core.TEST.csproj
+
+      - name: Restore Analysis
+        run: dotnet restore Analysis/Analysis.csproj
+
+      - name: Build Core.TEST
+        run: dotnet build Core.TEST/Core.TEST.csproj -c Release --no-restore /p:BeltRunnerBuildNumber=${{ github.run_number }}
+
+      - name: Build Analysis
+        run: dotnet build Analysis/Analysis.csproj -c Release --no-restore /p:BeltRunnerBuildNumber=${{ github.run_number }} /p:GeneratePackageOnBuild=false
+
+      - name: Test
+        run: dotnet test Core.TEST/Core.TEST.csproj -c Release --no-build --verbosity normal
+
+      - name: Pack Core
+        run: |
+          validation_args=""
+          if [ -n "${PACKAGE_VALIDATION_BASELINE_VERSION}" ]; then
+            echo "Package validation enabled against baseline ${PACKAGE_VALIDATION_BASELINE_VERSION}."
+            validation_args="/p:BeltRunnerPackageValidationBaselineVersion=${PACKAGE_VALIDATION_BASELINE_VERSION}"
+          else
+            echo "Package validation skipped because repository variable BELTRUNNER_PACKAGE_VALIDATION_BASELINE_VERSION is not set."
+          fi
+          dotnet pack Core/Core.csproj -c Release --no-restore /p:BeltRunnerBuildNumber=${{ github.run_number }} ${validation_args}
+
+      - name: Pack Analysis
+        run: |
+          validation_args=""
+          if [ -n "${PACKAGE_VALIDATION_BASELINE_VERSION}" ]; then
+            echo "Package validation enabled against baseline ${PACKAGE_VALIDATION_BASELINE_VERSION}."
+            validation_args="/p:BeltRunnerPackageValidationBaselineVersion=${PACKAGE_VALIDATION_BASELINE_VERSION}"
+          else
+            echo "Package validation skipped because repository variable BELTRUNNER_PACKAGE_VALIDATION_BASELINE_VERSION is not set."
+          fi
+          dotnet pack Analysis/Analysis.csproj -c Release --no-restore /p:BeltRunnerBuildNumber=${{ github.run_number }} ${validation_args}
+
+      - name: Upload NuGet Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: BeltRunner-packages
+          path: |
+            Core/bin/Release/*.nupkg
+            Core/bin/Release/*.snupkg
+            Analysis/bin/Release/*.nupkg
+            Analysis/bin/Release/*.snupkg
+          if-no-files-found: error
